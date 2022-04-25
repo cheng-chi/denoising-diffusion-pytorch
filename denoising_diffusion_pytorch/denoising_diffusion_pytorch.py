@@ -483,7 +483,8 @@ class Trainer(object):
     def __init__(
         self,
         diffusion_model,
-        folder,
+        dataset,
+        device,
         *,
         ema_decay = 0.995,
         image_size = 128,
@@ -498,7 +499,8 @@ class Trainer(object):
         results_folder = './results'
     ):
         super().__init__()
-        self.model = diffusion_model
+        self.device = device
+        self.model = diffusion_model.to(device)
         self.ema = EMA(ema_decay)
         self.ema_model = copy.deepcopy(self.model)
         self.update_ema_every = update_ema_every
@@ -511,7 +513,7 @@ class Trainer(object):
         self.gradient_accumulate_every = gradient_accumulate_every
         self.train_num_steps = train_num_steps
 
-        self.ds = Dataset(folder, image_size)
+        self.ds = dataset
         self.dl = cycle(data.DataLoader(self.ds, batch_size = train_batch_size, shuffle=True, pin_memory=True))
         self.opt = Adam(diffusion_model.parameters(), lr=train_lr)
 
@@ -554,7 +556,7 @@ class Trainer(object):
     def train(self):
         while self.step < self.train_num_steps:
             for i in range(self.gradient_accumulate_every):
-                data = next(self.dl).cuda()
+                data = next(self.dl).to(self.device)
 
                 with autocast(enabled = self.amp):
                     loss = self.model(data)
